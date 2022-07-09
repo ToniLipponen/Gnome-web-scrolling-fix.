@@ -1,65 +1,81 @@
 /// Change these to your liking.
-const scrollSpeed = 300;
-const scrollStep = 5;
-const autoScrollScale = 1; /// auto scroll speed multiplier.
+const maxVelocity       = 200.0;    //!< Maximum velocity of the regular scrolling.
+const deceleration      = 1.0;      //!< Deceleration multiplier (rate of slowing down)
+const scrollStep        = 1.0;      //!< Multiplier for the mouse wheel step.
+const autoScrollScale   = 1.0;      //!< auto scroll speed multiplier.
+const frameRate         = 60.0;     //!< FPS target (animation smoothness)
 
 let clock = Date;
-let scrollTarget = 0;
+let velocity = 0;
 let autoScrolling = false;
 let mouseClickY = 0;
 let mousePos = 0;
-let deltaTime = 0;
 let oldTime = 0;
 
-let deltaTimes = [0,0,0,0,0];
-let deltaTimeIndex = 0;
-
-function Average(array) {
-    let sum = 0;
-    for(let i = 0; i < array.length; i++)
-        sum += array[i];
-        
-    return sum / array.length;
+function Step(edge, value)
+{
+    return value > edge;
 }
 
-function GetDeltaTime() {
+function GetDeltaTime()
+{
     let time = clock.now();
-    deltaTimes[deltaTimeIndex] = time - oldTime;
+    const delta = (time - oldTime) * 0.01;
     oldTime = time;
-    deltaTimeIndex = (deltaTimeIndex += 1) % 5;
-    return Average(deltaTimes);
+    return delta;
 }
 
-window.addEventListener("mousewheel", function(e) { scrollTarget += e.deltaY * scrollStep; });
-window.addEventListener("mousemove", function(e) { mousePos = e.screenY; });
+window.addEventListener("mousewheel", function(e) 
+{
+    velocity = Math.max(Math.min(velocity += e.deltaY * scrollStep, maxVelocity), -maxVelocity);
+});
 
-window.addEventListener("click", function(e) {
-    if(e.button == 1) {
+window.addEventListener("mousemove", function(e)
+{ 
+    mousePos = e.screenY; 
+});
+
+window.addEventListener("click", function(e) 
+{
+    if(e.button == 1)
+    {
         mouseClickY = e.screenY;
         autoScrolling = !autoScrolling;
     }
     else
+    {
         autoScrolling = false;
+    }
 });
 
-window.onload = function() {
-    function myFunc(){
-        deltaTime = GetDeltaTime();
-        
+window.onload = function()
+{
+    function myFunc()
+    {
+        const deltaTime = GetDeltaTime();
+
         /// Auto scrolling
-        if(autoScrolling) {
-            window.scrollBy(0, (mousePos - mouseClickY) * autoScrollScale * deltaTime * 0.01);
+        if(autoScrolling)
+        {
+            const difference = mousePos - mouseClickY;
+            window.scrollBy(0, difference * (Step(40, difference) | Step(40, -difference)) * autoScrollScale * deltaTime);
         }
         
         /// Regular scrolling
-        else if(scrollTarget != 0) {
-            const absTarget = Math.abs(scrollTarget);
-            const direction = scrollTarget / absTarget;
-            const step = Math.min(deltaTime * 0.01 * scrollSpeed, absTarget) * direction;
+        else if(velocity > 0.1 || velocity < -0.1)
+        {
+            window.scrollBy(0, velocity * 10 * deltaTime);
             
-            window.scrollBy(0, step);
-            scrollTarget -= step;
+            if(velocity < 0)
+            {
+                velocity = Math.min(velocity += -velocity * deceleration * deltaTime, 0);
+            }
+            else
+            {
+                velocity = Math.max(velocity -= velocity * deceleration * deltaTime, 0);
+            }
         }
     }
-    setInterval(myFunc, 8);
+
+    setInterval(myFunc, 1000.0 / frameRate);
 }
